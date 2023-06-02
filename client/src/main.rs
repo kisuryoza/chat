@@ -1,5 +1,5 @@
+use std::net::SocketAddr;
 use std::process::{ExitCode, Termination};
-use std::{error::Error, net::SocketAddr};
 
 use dotenvy::dotenv;
 use tracing::Level;
