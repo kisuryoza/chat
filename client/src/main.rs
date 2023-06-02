@@ -1,3 +1,4 @@
+use std::process::{ExitCode, Termination};
 use std::{error::Error, net::SocketAddr};
 
 use dotenvy::dotenv;
@@ -7,8 +8,23 @@ use tracing::{debug, error, info, trace, warn};
 
 mod handle_connection;
 
+#[repr(u8)]
+pub enum GitBisectResult {
+    Good = 0,
+    Bad = 1,
+    Skip = 125,
+    Abort = 255,
+}
+
+impl Termination for GitBisectResult {
+    fn report(self) -> ExitCode {
+        // Maybe print a message here
+        ExitCode::from(self as u8)
+    }
+}
+
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
+async fn main() -> GitBisectResult {
     dotenv().expect(".env file not found");
 
     let tracing_level = &std::env::var("DEBUG_LEVEL").unwrap_or("INFO".to_string());
@@ -19,9 +35,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .init();
 
     let addr = &std::env::var("ADDRESS").expect("ADDRESS must be set.");
-    let addr = addr.parse::<SocketAddr>()?;
+    let addr = addr.parse::<SocketAddr>().unwrap();
 
-    handle_connection::handle_connection(&addr).await?;
+    handle_connection::handle_connection(&addr).await.unwrap();
 
-    Ok(())
+    GitBisectResult::Good
 }

@@ -1,9 +1,10 @@
+use bytes::{Buf, BufMut, Bytes, BytesMut};
 use tokio::{
     net::TcpStream,
     sync::{mpsc, Mutex},
 };
 use tokio_stream::StreamExt;
-use tokio_util::codec::{Framed, LinesCodec};
+use tokio_util::codec::{BytesCodec, Framed};
 
 use futures::SinkExt;
 use std::{collections::HashMap, error::Error, io, net::SocketAddr, sync::Arc};
@@ -12,10 +13,10 @@ use std::{collections::HashMap, error::Error, io, net::SocketAddr, sync::Arc};
 use tracing::{debug, error, info, trace, warn};
 
 /// Shorthand for the transmit half of the message channel.
-type Tx = mpsc::UnboundedSender<String>;
+type Tx = mpsc::UnboundedSender<Vec<u8>>;
 
 /// Shorthand for the receive half of the message channel.
-type Rx = mpsc::UnboundedReceiver<String>;
+type Rx = mpsc::UnboundedReceiver<Vec<u8>>;
 
 /// Data that is shared between all peers in the chat server.
 ///
@@ -34,7 +35,7 @@ struct Peer {
     /// This handles sending and receiving data on the socket. When using
     /// `Lines`, we can work at the line level instead of having to manage the
     /// raw byte operations.
-    lines: Framed<TcpStream, LinesCodec>,
+    lines: Framed<TcpStream, BytesCodec>,
 
     /// Receive half of the message channel.
     ///
@@ -53,7 +54,7 @@ impl Shared {
 
     /// Send a `LineCodec` encoded message to every peer, except
     /// for the sender.
-    async fn broadcast(&mut self, sender: SocketAddr, message: &str) {
+    async fn broadcast(&mut self, sender: SocketAddr, message: &[u8]) {
         for peer in self.peers.iter_mut() {
             if *peer.0 != sender {
                 let _ = peer.1.send(message.into());
@@ -66,7 +67,7 @@ impl Peer {
     /// Create a new instance of `Peer`.
     async fn new(
         state: Arc<Mutex<Shared>>,
-        lines: Framed<TcpStream, LinesCodec>,
+        lines: Framed<TcpStream, BytesCodec>,
     ) -> io::Result<Peer> {
         // Get the client socket address
         let addr = lines.get_ref().peer_addr()?;
@@ -87,7 +88,7 @@ pub async fn process(
     stream: TcpStream,
     addr: SocketAddr,
 ) -> Result<(), Box<dyn Error>> {
-    let lines = Framed::new(stream, LinesCodec::new());
+    let lines = Framed::new(stream, BytesCodec::new());
 
     // Send a prompt to the client to enter their username.
     /* lines.send("Please enter your username:").await?;
@@ -123,7 +124,8 @@ pub async fn process(
         tokio::select! {
             // A message was received from a peer. Send it to the current user.
             Some(msg) = peer.rx.recv() => {
-                peer.lines.send(&msg).await?;
+                let bytes = Bytes::from(msg);
+                peer.lines.send(bytes).await?;
             }
             result = peer.lines.next() => match result {
                 // A message was received from the current user, we should
@@ -133,7 +135,6 @@ pub async fn process(
                     // let msg = format!("{}: {}", username, msg);
 
                     state.broadcast(addr, &msg).await;
-                    println!("Received data: {}", &msg);
                 }
                 // An error occurred.
                 Some(Err(e)) => {
