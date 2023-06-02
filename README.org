@@ -1,0 +1,15 @@
+Making an asynchronous chat app with E2EE for educational purposes with:
+- [[https://github.com/tokio-rs/tokio][tokio]]
+- [[https://github.com/RustCrypto/elliptic-curves/tree/master/p256][ECDH]]
+- [[https://github.com/RustCrypto/AEADs/tree/master/aes-gcm][AES-GCM]]
+
+* Usage
+To start the server
+#+BEGIN_SRC bash
+cargo run --bin=server
+#+END_SRC
+
+To start client instanses
+#+BEGIN_SRC bash
+cargo run --bin=client
+#+END_SRC
