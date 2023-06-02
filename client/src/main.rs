@@ -7,6 +7,7 @@ use tracing::Level;
 use tracing::{debug, error, info, trace, warn};
 
 mod handle_connection;
+mod message;
 
 #[repr(u8)]
 pub enum GitBisectResult {
